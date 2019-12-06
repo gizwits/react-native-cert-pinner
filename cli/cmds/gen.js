@@ -4,8 +4,8 @@ var plist = require('plist');
 
 const Log = require('../Log');
 
-const andHead = 
-`package com.criticalblue.reactnative;
+const andHead =
+  `package com.criticalblue.reactnative;
 
 import okhttp3.CertificatePinner;
 
@@ -14,18 +14,36 @@ public class GeneratedCertificatePinner {
         CertificatePinner.Builder builder = new CertificatePinner.Builder();
 
 `;
-const andFoot = 
-`
+const andFoot =
+  `
         return builder.build();
     }
 }
 `;
 
+
+const readDirSync = (path, targetName) => {
+  const pa = fs.readdirSync(path);
+  for (let i = 0; i < pa.length; i++) {
+    const item = pa[i];
+    const info = fs.statSync(path + "/" + item)
+    if (info.isDirectory()) {
+      const data= readDirSync(path + "/" + item, targetName);
+      if (data) {
+        return data;
+      }
+    } else if (item === targetName) {
+      return path + "/" + item;
+    }
+  }
+  // console.log(data);
+}
+
 module.exports = (args) => {
   // prep config file
 
   const count = args._.length;
-  const srcPath = (count > 1)? args._[1] : './pinset.json';
+  const srcPath = (count > 1) ? args._[1] : './pinset.json';
   if (!fs.existsSync(srcPath)) {
     Log.fatal(`Missing config file: ${srcPath}`);
   }
@@ -47,7 +65,7 @@ module.exports = (args) => {
   const andPath = `${andBase}/app/src/main/java/com/criticalblue/reactnative/GeneratedCertificatePinner.java`;
 
   // prep ios project path
-  
+
   let iosBase = "./ios";
   if (args.i) {
     if (args.i.length <= 0) {
@@ -67,7 +85,10 @@ module.exports = (args) => {
     if (iosXcodeprojs.length != 1) {
       Log.fatal('Cannot find unique *.xcodeproj in ${iosBase)');
     }
-    iosPath = iosBase + '/' + path.basename(iosXcodeprojs[0], '.xcodeproj') + '/info.plist';
+
+    iosPath = iosBase + '/' + path.basename(iosXcodeprojs[0], '.xcodeproj');
+
+    iosPath = readDirSync(iosPath, 'Info.plist')
     if (!fs.existsSync(iosPath)) {
       Log.fatal(`Missing iOS plist file: ${iosPath}`);
     }
@@ -132,14 +153,14 @@ module.exports = (args) => {
         });
       }
       fs.writeFileSync(andPath, andHead + andBody + andFoot);
-    } catch(err) {
+    } catch (err) {
       Log.fatal(`Java file '${andPath}' error: ${err}`);
     }
   }
 
   // write ios config
 
-  if (iosUpdate) {    
+  if (iosUpdate) {
     Log.info(`Updating plist file '${iosPath}'.`);
 
     try {
@@ -151,7 +172,7 @@ module.exports = (args) => {
           includeSubdomains = true;
           baseDomain = domain.substring(2);
         }
-        let iosDomain = { 
+        let iosDomain = {
           TSKEnforcePinning: true,
           TSKIncludeSubdomains: includeSubdomains,
           TSKPublicKeyAlgorithms: ['TSKAlgorithmRsa2048'],
@@ -174,7 +195,7 @@ module.exports = (args) => {
 
       // WRITE OUT FILE HERE
       fs.writeFileSync(iosPath, plist.build(iosInfo));
-    } catch(err) {
+    } catch (err) {
       Log.fatal(`iOS plist file '${iosPath}' error: ${err}`);
     }
   }
